@@ -11,20 +11,23 @@ let body = $response.body;
 let obj = JSON.parse(body);
 
 const country = obj['country'] || "未知国家";
-const city = city_check(obj['city'] || obj['regionName']); // 优先使用城市，无城市则显示地区
 const isp = isp_check(obj['as'] || obj['isp']);
 
-// 1. 标题 (Title)：国旗 + 国家
+// 1. 标题 (Title)：国旗 + 国家名称
 let title = (flags.get(obj['countryCode']) || "🏳️") + ' ' + country;
 
-// 2. 副标题 (Subtitle)：位置信息 + 运营商 (参考 net-lsp-x.js 逻辑，隐藏IP)
-// 格式如：洛杉矶 · Cloudflare
-let subtitle = (city !== '' ? city + ' · ' : '') + isp;
+// 2. 处理副标题位置信息：剔除重复的国家名
+// 例如：从 "Hong Kong Kowloon" 中剔除 "Hong Kong"，只留 "Kowloon"
+let rawLocation = obj['city'] || obj['regionName'] || "";
+let displayLocation = clean_location(country, rawLocation);
+
+// 副标题格式：位置 · 运营商
+let subtitle = (displayLocation !== '' ? displayLocation + ' · ' : '') + isp;
 
 // 3. 内部 IP 变量
 let ip = obj['query'];
 
-// 4. 详细描述 (Description)：保留 IP 显示及所有细节
+// 4. 详细描述 (Description)：长按查看时显示完整数据
 let description = '国家：' + obj['countryCode'] + ' ' + country + '\n'
   + '地区：' + obj['region'] + ' ' + (obj['regionName'] || '') + '\n'
   + '城市：' + (obj['city'] || '') + '\n'
@@ -36,16 +39,24 @@ let description = '国家：' + obj['countryCode'] + ' ' + country + '\n'
 $done({title, subtitle, ip, description});
 
 // --- 工具函数 ---
-function city_check(para) {
-  if (!para) return '';
-  const paraWithoutSpaces = para.replace(/\s/g, '');
-  // 如果全是英文字母（通常是拼音或英文名），在副标题中可以保留或根据偏好精简
-  // 这里保留非纯英文的地理名称，如果是英文则直接返回原词
-  return para; 
+
+/**
+ * 核心逻辑：从地理位置字符串中移除国家名称
+ */
+function clean_location(country, location) {
+  if (!location) return "";
+  // 1. 移除位置字符串中包含的国家名（不区分大小写）
+  let cleaned = location.replace(new RegExp(country, 'gi'), '').trim();
+  
+  // 2. 清理多余的空格、逗号或特殊分隔符
+  cleaned = cleaned.replace(/^[\s,，·]+|[\s,，·]+$/g, '');
+  
+  // 3. 如果清理后变为空（说明位置名和国家名完全一样），则返回原位置名或空
+  return cleaned === "" ? "" : cleaned;
 }
 
 function isp_check(para) {
   if (!para) return isp0;
-  // 简缩运营商信息，去除冗余的 AS 编号 (参考 net-lsp-x.js 的 simplifyAddr 思想)
-  return para.replace(/AS\d+\s+/g, ''); 
+  // 移除 AS 编号，只保留服务商名称
+  return para.replace(/AS\d+\s+/g, '').trim(); 
 }
