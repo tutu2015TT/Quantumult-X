@@ -16,12 +16,16 @@ const isp = isp_check(obj['as'] || obj['isp']);
 // 1. 标题 (Title)：国旗 + 国家名称
 let title = (flags.get(obj['countryCode']) || "🏳️") + ' ' + country;
 
-// 2. 处理副标题位置信息：剔除重复的国家名
-// 例如：从 "Hong Kong Kowloon" 中剔除 "Hong Kong"，只留 "Kowloon"
-let rawLocation = obj['city'] || obj['regionName'] || "";
-let displayLocation = clean_location(country, rawLocation);
+// 2. 处理副标题位置信息
+// 获取具体位置（城市或地区）
+let rawCity = obj['city'] || "";
+let rawRegion = obj['regionName'] || "";
+let locationCandidate = rawCity !== "" ? rawCity : rawRegion;
 
-// 副标题格式：位置 · 运营商
+// 如果位置信息里包含国家名，则去掉国家名，保留具体位置（如 Kowloon）
+let displayLocation = clean_location(country, locationCandidate);
+
+// 副标题格式：具体位置 · 运营商 (隐藏IP)
 let subtitle = (displayLocation !== '' ? displayLocation + ' · ' : '') + isp;
 
 // 3. 内部 IP 变量
@@ -41,18 +45,26 @@ $done({title, subtitle, ip, description});
 // --- 工具函数 ---
 
 /**
- * 核心逻辑：从地理位置字符串中移除国家名称
+ * 核心逻辑：从地理位置字符串中精准移除国家名称
  */
 function clean_location(country, location) {
   if (!location) return "";
-  // 1. 移除位置字符串中包含的国家名（不区分大小写）
+  
+  // 如果位置名和国家名完全一样，返回空（因为标题已经有国家名了）
+  if (location.toLowerCase() === country.toLowerCase()) {
+    return "";
+  }
+
+  // 使用正则替换掉位置字符串中包含的国家名部分（不区分大小写）
+  // 例如将 "Hong Kong Kowloon" 变为 " Kowloon"
   let cleaned = location.replace(new RegExp(country, 'gi'), '').trim();
   
-  // 2. 清理多余的空格、逗号或特殊分隔符
-  cleaned = cleaned.replace(/^[\s,，·]+|[\s,，·]+$/g, '');
+  // 清理多余的标点符号和空格
+  cleaned = cleaned.replace(/^[\s,，·/|-]+|[\s,，·/|-]+$/g, '');
   
-  // 3. 如果清理后变为空（说明位置名和国家名完全一样），则返回原位置名或空
-  return cleaned === "" ? "" : cleaned;
+  // 如果清理后还有内容，返回清理后的内容（如 Kowloon）
+  // 如果清理后空了，说明原位置名就是国家名，则返回空
+  return cleaned;
 }
 
 function isp_check(para) {
