@@ -12,18 +12,19 @@ let obj = JSON.parse(body);
 const country = country_check(obj['country']);
 const city = city_check(obj['city']);
 
-// 1. 修改标题：保持不变 (国旗 国家 地区)
+// 1. 标题（第1行）：国旗 + 国家/地区
 let title = flags.get(obj['countryCode']) + ' ' + append(country, city);
 
-// 2. 修改副标题：移除 obj['query'] (隐藏IP)
+// 2. 副标题（第2行）：仅显示服务商，隐藏 IP
 let subtitle = isp_check(obj['as']);
 
-// 3. 修改内部IP变量：脱敏处理
-let ip = "IP Hidden";
+// 3. 内部 IP 变量（传给节点的 IP 字段）
+let ip = obj['query'];
 
-// 4. 修改详细描述：移除IP行
+// 4. 详细描述（长按节点查看）：保留 IP 和所有原始信息
 let description = '国家：' + obj['countryCode'] + ' ' + obj['country'] + '\n'
   + '地区：' + obj['region'] + ' ' + city_check(obj['regionName']) + '\n'
+  + 'IP：' + obj['query'] + '\n'
   + '服务商：' + obj['isp'] + '\n'
   + '经纬度：' + obj['lat'] + ' / ' + obj['lon'] + '\n'
   + '时区：' + obj['timezone'];
@@ -48,7 +49,6 @@ function city_check(para) {
 function isp_check(para) {
   return para || isp0;
 }
-
 function append(country, city) {
   return country === city ? country : country + ' ' + city;
 }
