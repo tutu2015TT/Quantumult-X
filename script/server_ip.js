@@ -12,25 +12,35 @@ const country = obj['country'] || "";
 const countryCode = obj['countryCode'] || "";
 const isp = isp_check(obj['as'] || obj['isp']);
 
-// 1. 标题 (Title)：国旗 + 国家名
+// 1. 标题：国旗 + 国家名
 let title = (flags.get(countryCode) || "🏳️") + ' ' + country;
 
-// 2. 副标题位置处理 (借鉴 net-lsp-x.js 风格)
-// 合并城市和地区，确保不漏掉任何细节
+// 2. 副标题位置处理 (参考 net-lsp-x.js 动态去重逻辑)
 let city = obj['city'] || "";
 let region = obj['regionName'] || "";
-let combinedLocation = (city === region) ? city : (region + " " + city);
 
-// 精准剔除国家名称（包括中英文及常见冗余词），保留 Kowloon 等具体位置
-let displayLocation = clean_location_pro(combinedLocation, country);
+// 合并所有地理词汇并按空格拆分，使用 Set 自动去重
+// 例如："Hong Kong Kowloon" 拆分为 ["Hong", "Kong", "Kowloon"]
+let locationWords = (region + " " + city).split(/\s+/);
+let uniqueWords = Array.from(new Set(locationWords));
 
-// 副标题格式：位置 · 运营商 (隐藏 IP)
+// 动态移除国家名称包含的词汇
+// 例如：国家是 "Hong Kong"，则从数组中删掉 "Hong" 和 "Kong"
+let countryWords = country.split(/\s+/);
+let filteredWords = uniqueWords.filter(word => 
+  !countryWords.some(cWord => cWord.toLowerCase() === word.toLowerCase()) && word !== ""
+);
+
+// 重新组合，剩下的就是具体位置，如 "Kowloon"
+let displayLocation = filteredWords.join(' ').trim();
+
+// 副标题格式：位置 · 运营商 (完全隐藏 IP)
 let subtitle = (displayLocation !== '' ? displayLocation + ' · ' : '') + isp;
 
-// 3. 内部 IP (Quantumult X 节点内部字段)
+// 3. 内部字段
 let ip = obj['query'];
 
-// 4. 详细描述 (Description)：长按查看时保留 IP
+// 4. 详细描述 (长按查看)：保留 IP
 let description = '国家：' + countryCode + ' ' + country + '\n'
   + '地区：' + obj['region'] + ' ' + region + '\n'
   + '城市：' + city + '\n'
@@ -42,41 +52,8 @@ let description = '国家：' + countryCode + ' ' + country + '\n'
 $done({title, subtitle, ip, description});
 
 // --- 工具函数 ---
-
-/**
- * 强化版位置清理逻辑：
- * 1. 合并字段确保 Kowloon 不会因为在 region 里而被忽略
- * 2. 同时剔除中文和英文的国家名
- */
-function clean_location_pro(loc, countryName) {
-  if (!loc) return "";
-  
-  let cleaned = loc;
-  // 需要剔除的黑名单（国家名、地区级行政单位名）
-  const blacklist = [
-    countryName, 
-    "Hong Kong", "香港", 
-    "Taiwan", "台湾", "中国台湾", 
-    "Macau", "澳门", 
-    "China", "中国"
-  ];
-
-  blacklist.forEach(item => {
-    if (item) {
-      const reg = new RegExp(item, 'gi');
-      cleaned = cleaned.replace(reg, '');
-    }
-  });
-
-  // 清理残留的空格和特殊符号（如“香港 Kowloon”删掉香港后剩下的空格）
-  cleaned = cleaned.replace(/^[\s,，·/|-]+|[\s,，·/|-]+$/g, '').trim();
-  
-  // 如果清理完只剩下重复的词，去重
-  return Array.from(new Set(cleaned.split(/\s+/))).join(' ');
-}
-
 function isp_check(para) {
   if (!para) return "未知服务商";
-  // 移除 AS 编号（net-lsp-x.js 风格）
+  // 移除 AS 编号 (参考 net-lsp-x.js: para.replace(/AS\d+\s+/g, ''))
   return para.replace(/AS\d+\s+/g, '').trim(); 
 }
